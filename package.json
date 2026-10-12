@@ -4,7 +4,7 @@
   "private": true,
   "description": "Node.js pair-programming exercise",
   "scripts": {
-    "test": "node --test --test-reporter=spec test/*.test.js",
+    "test": "node --test --test-reporter=spec test/task1.test.js test/task2.test.js test/task3.test.js",
     "test:1": "node --test --test-reporter=spec test/task1.test.js",
     "test:2": "node --test --test-reporter=spec test/task2.test.js",
     "test:3": "node --test --test-reporter=spec test/task3.test.js",
@@ -15,5 +15,8 @@
   },
   "dependencies": {
     "express": "^5.1.0"
+  },
+  "stackblitz": {
+    "startCommand": "npm test"
   }
 }

@@ -49,6 +49,20 @@ test('100 parallel calls for the same key call the loader only once', T, async (
   assert.ok(results.every((r) => r === 'data'));
 });
 
+test('parallel calls for different keys each use their own loader', T, async () => {
+  const loaderA = makeLoader('A');
+  const loaderB = makeLoader('B');
+  const results = await Promise.all([
+    getOrLoad('a', loaderA),
+    getOrLoad('b', loaderB),
+    getOrLoad('a', loaderA),
+    getOrLoad('b', loaderB),
+  ]);
+  assert.deepEqual(results, ['A', 'B', 'A', 'B']);
+  assert.equal(loaderA.calls, 1);
+  assert.equal(loaderB.calls, 1);
+});
+
 test('if the loader fails, all waiting callers get the error and the loader ran once', T, async () => {
   let calls = 0;
   const failing = async () => {

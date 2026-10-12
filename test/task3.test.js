@@ -104,3 +104,37 @@ test('onIdle() resolves only after all jobs are finished', T, async () => {
   await withTimeout(q.onIdle(), 1500, 'onIdle() never resolved');
   assert.equal(finished, 3);
 });
+
+test('onIdle() also waits for jobs that are still waiting in the queue', T, async () => {
+  const q = new JobQueue(2);
+  let finished = 0;
+
+  for (let i = 0; i < 6; i++) {
+    q.add(async () => {
+      await sleep(20);
+      finished++;
+    });
+  }
+
+  await withTimeout(q.onIdle(), 1500, 'onIdle() never resolved');
+  assert.equal(finished, 6);
+});
+
+test('onIdle() resolves even when the last job failed', T, async () => {
+  const q = new JobQueue(1);
+  let finished = 0;
+
+  q.add(async () => {
+    await sleep(20);
+    finished++;
+    throw new Error('bad job');
+  }).catch(() => {});
+
+  await withTimeout(q.onIdle(), 1500, 'onIdle() never resolved after a failed job');
+  assert.equal(finished, 1);
+});
+
+test('onIdle() resolves right away when there are no jobs', T, async () => {
+  const q = new JobQueue(2);
+  await withTimeout(q.onIdle(), 500, 'onIdle() never resolved on an empty queue');
+});

@@ -1,99 +1,141 @@
 # Node.js Pair-Programming Exercise
 
-Hi! This is a small project with 4 tasks. We will work on it together.
-There is no trick. We care about how you think, not only the final code.
+Welcome! We will work on this project together.
 
 
-## How to run
+## The idea
 
-Open a terminal and run:
+- The code in the "src" folder is already written, but it has bugs and missing parts.
+- The tests in the "test" folder check the correct behaviour.
+- Your job: fix the code in "src" until the tests pass.
 
-    npm test
+There are 4 tasks. Start with Task 1 and go in order.
+You may not finish all of them. That is OK.
+We care about how you think, not only the final code.
 
-Most tests fail at the start. Your job is to make them pass by changing the files in the "src" folder.
 
-To run only one task:
+## How to run the tests
 
-    npm run test:1
-    npm run test:2
-    npm run test:3
+Type one of these in the terminal:
 
-Please do not change the files in the "test" folder. You can read them.
-(If you run this on your own computer, run "npm install" first.)
+    npm test          (all tasks)
+    npm run test:1    (only Task 1)
+    npm run test:2    (only Task 2)
+    npm run test:3    (only Task 3)
+
+Many tests fail at the start. This is expected.
+A task is done when all its tests pass.
 
 
 ## Rules
 
+- Change only the files in "src". Do not change the files in "test" (you can read them).
 - Think out loud. Ask questions.
 - You can use Google and docs (MDN, Node.js, Express).
-- Please do not use AI assistants, unless the interviewer says it is OK.
+- Please do not use AI assistants.
 - Working, readable code is enough. It does not need to be perfect.
 - If you are stuck, say so. Hints are normal.
 
 
-## Task 1: Orders API (Express)
+## Task 1: Fix the Orders API
 
-Files: src/task1-api/ (start with app.js)
-Run: npm run test:1
+Folder: src/task1-api/
 
-What the API should do:
+    app.js      the API routes. Most of your changes go here.
+    db.js       a small fake database. You can change it too.
+    server.js   starts the API. You do not need to change it.
 
-GET /orders
-- Return 200 and a list of orders.
-- ?status=paid shows only orders with that status.
-- ?sort=total sorts by total, highest first.
-- Sorting must not change the stored data.
+Tests: npm run test:1
 
-GET /orders/:id
-- Return 200 and the order.
-- Return 400 if the id is not a positive whole number.
-- Return 404 if there is no order with that id.
+app.js has three routes. They run, but they do not follow the rules below yet.
+Change the code so that every rule is true.
 
-POST /orders
-- The body looks like this: { "customer": "Ali", "total": 50 }
-- customer must be text and not empty.
-- total must be a number greater than 0.
-- If the input is good: return 201 and the new order (status "pending").
-- If the input is bad: return 400.
+Route 1: GET /orders
 
-Any other error
-- Return 500 and a JSON body like { "error": "..." }.
-- Do not show internal details to the client.
+- Returns 200 and the list of orders.
+- With ?status=paid it returns only the orders with that status.
+- With ?sort=total it returns the orders sorted by total, highest first.
+- Sorting must not change the order of the data in the database.
+
+Route 2: GET /orders/:id
+
+- Returns 200 and the order with that id.
+- Returns 404 if there is no order with that id.
+- Returns 400 if the id is not a positive whole number.
+  Examples of bad ids: abc, 0, -1, 1.5, 2abc
+
+Route 3: POST /orders
+
+- The body is JSON, like this: { "customer": "Ali", "total": 50 }
+- Good input: save the order, return 201 and the new order.
+  A new order always has the status "pending".
+- Bad input: save nothing and return 400. Input is bad when:
+  - customer is missing, is not text, or is empty
+  - total is missing, is not a number, or is not greater than 0
+  - there is no body, or the body is not valid JSON
+- The database chooses the id. If the body has "id" or "status", ignore them.
+
+Errors (all routes)
+
+- Every error response (400, 404, 500) is JSON, like this: { "error": "some message" }
+- If something unexpected fails (for example the database), return 500.
+- A 500 response must not show internal details (no real error message, no stack trace).
 
 
-## Task 2: Cache
+## Task 2: Fix the cache
 
 File: src/task2-cache/cache.js
-Run: npm run test:2
+Tests: npm run test:2
 
-getOrLoad(key, loader, ttlMs) gives back the saved value for a key.
-If there is no fresh value, it calls loader() (an async function),
-saves the result for ttlMs milliseconds, and returns it.
+What the function does:
 
-It works for simple cases, but it wastes work when many requests
-arrive at the same time. Fix it.
-Also think about what should happen when the loader fails.
+    getOrLoad(key, loader, ttlMs)
+
+- If a fresh value is saved for the key, it returns that value.
+- If not, it calls loader() (an async function), saves the result
+  for ttlMs milliseconds, and returns it.
+
+The problem: when many callers ask for the same key at the same time,
+loader() runs once for each caller. That wastes work.
+
+Change the code so that every rule is true:
+
+- Callers that ask for the same key at the same time share one loader() call.
+- Different keys do not share a loader() call.
+- If loader() fails, every waiting caller gets the error.
+- A failed load is not saved. The next call runs loader() again.
+- A saved value is used only for ttlMs milliseconds.
 
 
-## Task 3: Job queue
+## Task 3: Fix the job queue
 
 File: src/task3-queue/queue.js
-Run: npm run test:3
+Tests: npm run test:3
 
 JobQueue runs async jobs, but only a few at the same time.
+The class is already written, but it has more than one bug.
+Find the bugs and fix them.
 
-- new JobQueue(3) means at most 3 jobs run at once.
-- add(job): job is a function that returns a promise.
-  add gives back a promise with the job's result (or its error).
-- onIdle(): gives back a promise that is done when all jobs have finished.
+How it should work:
 
-Some tests fail. Find out why and fix the code.
+- new JobQueue(3): at most 3 jobs run at the same time.
+- add(job): "job" is a function that returns a promise.
+  add() returns a promise with the result of the job, or its error.
+- Jobs start in the order they were added.
+- If one job fails, the other jobs still run.
+- onIdle(): returns a promise that is done when all jobs are finished,
+  also when some jobs failed. If there are no jobs, it is done right away.
 
 
 ## Task 4: Code review
 
 File: src/task4-review/search-users.js
 
-Imagine a teammate sent you this pull request. Review it like you would at work.
-Write your comments in the file (start each one with // REVIEW:) or say them out loud.
-Start with the most important problems. You do not need to rewrite the code.
+This task has no tests and you do not need to write code.
+
+Imagine a teammate sent you this file as a pull request.
+Review it like you would at work:
+
+- Say your comments out loud, or write them in the file (start each one with // REVIEW:).
+- Start with the most important problems.
+- You do not need to rewrite the code.
