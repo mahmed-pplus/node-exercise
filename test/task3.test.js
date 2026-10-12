@@ -1,7 +1,6 @@
 const { test } = require('node:test');
-const assert = require('node:assert/strict');
 const JobQueue = require('../src/task3-queue/queue');
-const { sleep, withTimeout } = require('./helpers');
+const { sleep, check, outcome, withTimeout } = require('./helpers');
 
 const T = { timeout: 5000 };
 
@@ -19,59 +18,82 @@ function trackedJob(tracker, ms, result) {
 test('never runs more jobs at the same time than the limit', T, async () => {
   const q = new JobQueue(3);
   const tracker = { running: 0, max: 0 };
+  const did = 'added 10 jobs to new JobQueue(3)';
 
-  await Promise.all(
-    Array.from({ length: 10 }, (_, i) => q.add(trackedJob(tracker, 20, i)))
+  await withTimeout(
+    Promise.all(Array.from({ length: 10 }, (_, i) => q.add(trackedJob(tracker, 20, i)))),
+    1500,
+    did,
+    'all 10 jobs finish'
   );
 
-  assert.equal(tracker.max, 3);
+  check(did, 'the highest number of jobs that ran at the same time', tracker.max, 3);
 });
 
-test('returns the result of each job', T, async () => {
+test('add() returns the result of each job', T, async () => {
   const q = new JobQueue(2);
-  const results = await Promise.all(
-    [1, 2, 3, 4, 5].map((n) =>
-      q.add(async () => {
-        await sleep(5);
-        return n * 2;
-      })
-    )
+  const did = 'added 5 jobs to new JobQueue(2). The jobs return 2, 4, 6, 8, 10';
+
+  const results = await withTimeout(
+    Promise.all(
+      [1, 2, 3, 4, 5].map((n) =>
+        q.add(async () => {
+          await sleep(5);
+          return n * 2;
+        })
+      )
+    ),
+    1500,
+    did,
+    'all 5 jobs finish'
   );
-  assert.deepEqual(results, [2, 4, 6, 8, 10]);
+
+  check(did, 'the results that add() gave back', results, [2, 4, 6, 8, 10]);
 });
 
 test('starts jobs in the order they were added', T, async () => {
   const q = new JobQueue(1);
   const started = [];
+  const did = 'added the jobs 0, 1, 2, 3, 4 to new JobQueue(1)';
 
-  await Promise.all(
-    [0, 1, 2, 3, 4].map((n) =>
-      q.add(async () => {
-        started.push(n);
-        await sleep(5);
-      })
-    )
+  await withTimeout(
+    Promise.all(
+      [0, 1, 2, 3, 4].map((n) =>
+        q.add(async () => {
+          started.push(n);
+          await sleep(5);
+        })
+      )
+    ),
+    1500,
+    did,
+    'all 5 jobs finish'
   );
 
-  assert.deepEqual(started, [0, 1, 2, 3, 4]);
+  check(did, 'the order in which the jobs started', started, [0, 1, 2, 3, 4]);
 });
 
 test('a failing job rejects only its own promise', T, async () => {
   const q = new JobQueue(2);
+  const did = 'added 3 jobs to new JobQueue(2): the first returns "a", the second fails with "bad job", the third returns "c"';
 
-  const results = await Promise.allSettled([
-    q.add(async () => 'a'),
-    q.add(async () => {
-      throw new Error('bad job');
-    }),
-    q.add(async () => 'c'),
-  ]);
+  const results = await withTimeout(
+    Promise.all([
+      outcome(q.add(async () => 'a')),
+      outcome(q.add(async () => {
+        throw new Error('bad job');
+      })),
+      outcome(q.add(async () => 'c')),
+    ]),
+    1500,
+    did,
+    'all 3 jobs finish'
+  );
 
-  assert.deepEqual(results.map((r) => r.status), ['fulfilled', 'rejected', 'fulfilled']);
-  assert.equal(results[1].reason.message, 'bad job');
+  check(did, 'what add() gave back for each job', results, [{ value: 'a' }, { error: 'bad job' }, { value: 'c' }]);
 });
 
-test('keeps processing jobs after some jobs have failed', T, async () => {
+test('keeps running jobs after some jobs have failed', T, async () => {
   const q = new JobQueue(2);
   const failing = () =>
     q.add(async () => {
@@ -83,14 +105,19 @@ test('keeps processing jobs after some jobs have failed', T, async () => {
       await sleep(5);
       return n;
     });
+  const did = 'added 3 failing jobs, then 3 working jobs (they return 1, 2, 3) to new JobQueue(2)';
 
-  const all = Promise.allSettled([failing(), failing(), failing(), working(1), working(2), working(3)]);
-  const results = await withTimeout(all, 1500, 'Queue got stuck after failed jobs');
+  const results = await withTimeout(
+    Promise.all([failing(), failing(), failing(), working(1), working(2), working(3)].map(outcome)),
+    1500,
+    did,
+    'all 6 jobs finish (the queue must not get stuck)'
+  );
 
-  assert.deepEqual(results.slice(3).map((r) => r.value), [1, 2, 3]);
+  check(did, 'what add() gave back for the 3 working jobs', results.slice(3), [{ value: 1 }, { value: 2 }, { value: 3 }]);
 });
 
-test('onIdle() resolves only after all jobs are finished', T, async () => {
+test('onIdle() is done only after all jobs are finished', T, async () => {
   const q = new JobQueue(3);
   let finished = 0;
 
@@ -101,8 +128,9 @@ test('onIdle() resolves only after all jobs are finished', T, async () => {
     });
   }
 
-  await withTimeout(q.onIdle(), 1500, 'onIdle() never resolved');
-  assert.equal(finished, 3);
+  const did = 'added 3 jobs to new JobQueue(3), then waited for onIdle()';
+  await withTimeout(q.onIdle(), 1500, did, 'onIdle() is done');
+  check(did, 'how many jobs were finished when onIdle() was done', finished, 3);
 });
 
 test('onIdle() also waits for jobs that are still waiting in the queue', T, async () => {
@@ -116,11 +144,12 @@ test('onIdle() also waits for jobs that are still waiting in the queue', T, asyn
     });
   }
 
-  await withTimeout(q.onIdle(), 1500, 'onIdle() never resolved');
-  assert.equal(finished, 6);
+  const did = 'added 6 jobs to new JobQueue(2), then waited for onIdle()';
+  await withTimeout(q.onIdle(), 1500, did, 'onIdle() is done');
+  check(did, 'how many jobs were finished when onIdle() was done', finished, 6);
 });
 
-test('onIdle() resolves even when the last job failed', T, async () => {
+test('onIdle() is done even when the last job failed', T, async () => {
   const q = new JobQueue(1);
   let finished = 0;
 
@@ -130,11 +159,12 @@ test('onIdle() resolves even when the last job failed', T, async () => {
     throw new Error('bad job');
   }).catch(() => {});
 
-  await withTimeout(q.onIdle(), 1500, 'onIdle() never resolved after a failed job');
-  assert.equal(finished, 1);
+  const did = 'added 1 failing job to new JobQueue(1), then waited for onIdle()';
+  await withTimeout(q.onIdle(), 1500, did, 'onIdle() is done');
+  check(did, 'how many jobs were finished when onIdle() was done', finished, 1);
 });
 
-test('onIdle() resolves right away when there are no jobs', T, async () => {
+test('onIdle() is done right away when there are no jobs', T, async () => {
   const q = new JobQueue(2);
-  await withTimeout(q.onIdle(), 500, 'onIdle() never resolved on an empty queue');
+  await withTimeout(q.onIdle(), 500, 'called onIdle() on a new JobQueue(2) with no jobs', 'onIdle() is done');
 });
