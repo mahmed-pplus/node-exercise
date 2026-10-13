@@ -107,24 +107,29 @@ Change the code so that every rule is true:
 - A saved value is used only for ttlMs milliseconds.
 
 
-## Task 3: Fix the job queue
+## Task 3: Fix the retry helper
 
-File: src/task3-queue/queue.js
+File: src/task3-retry/retry.js
 Tests: npm run test:3
 
-JobQueue runs async jobs, but only a few at the same time.
-The class is already written, but it has more than one bug.
+Sometimes a call fails only for a short time (for example a network problem).
+Then it helps to try again. This is what retry() does:
+
+    retry(fn, { retries, delayMs, shouldRetry })
+
+The function is already written, but it has more than one bug.
 Find the bugs and fix them.
 
 How it should work:
 
-- new JobQueue(3): at most 3 jobs run at the same time.
-- add(job): "job" is a function that returns a promise.
-  add() returns a promise with the result of the job, or its error.
-- Jobs start in the order they were added.
-- If one job fails, the other jobs still run.
-- onIdle(): returns a promise that is done when all jobs are finished,
-  also when some jobs failed. If there are no jobs, it is done right away.
+- It calls fn() (an async function). If fn() works, retry() returns its result.
+- If fn() fails, it calls fn() again. "retries" is the number of extra tries.
+  Example: retries: 3 means at most 4 calls in total.
+- Before each new try, it waits delayMs milliseconds.
+- If the last try also fails, retry() throws the error of that last try.
+  It does not wait after the last try.
+- shouldRetry is optional. It is a function that gets the error and returns true or false.
+  If it returns false, retry() stops right away and throws that error.
 
 
 ## Task 4: Code review

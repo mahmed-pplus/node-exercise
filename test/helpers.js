@@ -43,17 +43,6 @@ async function outcome(promise) {
   }
 }
 
-// Fails the test if a promise takes too long (for example a stuck queue).
-function withTimeout(promise, ms, did, checked) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      reject(failure(did, checked, `done within ${ms} ms`, `still not done after ${ms} ms`));
-    }, ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
 // Starts the Express app on a random free port.
 async function startServer(app) {
   const server = await new Promise((resolve) => {
@@ -68,4 +57,4 @@ async function startServer(app) {
   return { base, close };
 }
 
-module.exports = { sleep, show, preview, failure, check, outcome, withTimeout, startServer };
+module.exports = { sleep, show, preview, failure, check, outcome, startServer };

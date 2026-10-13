@@ -6,7 +6,7 @@ const path = require('node:path');
 const TITLES = {
   'task1.test.js': 'Task 1: Orders API',
   'task2.test.js': 'Task 2: Cache',
-  'task3.test.js': 'Task 3: Job queue',
+  'task3.test.js': 'Task 3: Retry',
 };
 
 const useColor = !process.env.NO_COLOR && Boolean(process.stdout.isTTY || process.env.FORCE_COLOR);
