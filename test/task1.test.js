@@ -85,11 +85,11 @@ test('GET /orders?sort=total returns orders sorted by total, highest first', T, 
 
 test('GET /orders?sort=total does not change the order of the data in the database', T, async () => {
   await send('GET', '/orders?sort=total');
-  const stored = await db.listOrders();
+  const second = await send('GET', '/orders');
   check(
-    'GET /orders?sort=total, then read the orders directly from the database',
-    'the ids of the orders in the database (must be unchanged)',
-    ids(stored),
+    'first GET /orders?sort=total, then a second request: GET /orders (without sort)',
+    'the ids from the second request. It has no sort, so the orders must come in the normal database order',
+    ids(second.body),
     [1, 2, 3, 4]
   );
 });
